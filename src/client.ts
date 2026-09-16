@@ -1,11 +1,15 @@
 import {Client, GatewayIntentBits, TextChannel } from "discord.js";
 import config from "./config.js";
+import gameNews from "./custom_events/gameNews.js";
+import gameReleases from "./custom_events/gameReleases.js";
+import popularGames from "./custom_events/popularGames.js";
 import { registerDiscordEvents } from "./handlers/discordEvents.js";
 
 export class DiscordClient extends Client {
 
     private activitiesInterval?: NodeJS.Timeout;
     private pingInterval?: NodeJS.Timeout;
+    private feedIntervals: NodeJS.Timeout[] = [];
     private eventsReady: Promise<void>;
 
     constructor() {
@@ -31,6 +35,9 @@ export class DiscordClient extends Client {
             }, config.ACTIVITIES_INTERVAL);
 
             await this.honeypotSetup();
+            await this.startFeed(config.GAME_RELEASES.ENABLED, gameReleases, config.GAME_RELEASES.INTERVAL);
+            await this.startFeed(config.GAME_NEWS.ENABLED, gameNews, config.GAME_NEWS.INTERVAL);
+            await this.startFeed(config.POPULAR_GAMES.ENABLED, popularGames, config.POPULAR_GAMES.INTERVAL);
 
         });
 
@@ -70,6 +77,9 @@ export class DiscordClient extends Client {
         if (this.pingInterval) {
             clearInterval(this.pingInterval);
         }
+        for (const interval of this.feedIntervals) {
+            clearInterval(interval);
+        }
     }
 
     async logPing() {
@@ -92,5 +102,14 @@ export class DiscordClient extends Client {
                 honeypotChannel.send(config.HONEYPOT.WARNING_MESSAGE);
             }
         }
+    }
+
+    async startFeed(enabled: boolean, execute: (client: DiscordClient) => Promise<void>, interval: number) {
+        if (!enabled) return;
+
+        await execute(this);
+        this.feedIntervals.push(setInterval(() => {
+            void execute(this);
+        }, interval));
     }
 }
