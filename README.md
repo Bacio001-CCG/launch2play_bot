@@ -26,6 +26,7 @@ pnpm install
 
 ```
 DISCORD_TOKEN=your_bot_token_here
+RAWG_API_KEY=your_rawg_api_token_here
 ```
 
 3. Run the bot:
