@@ -30,4 +30,9 @@ export default {
         CLIENT_READY: true,
         CLIENT_READY_CONDENSED: true,
     },
+    HONEYPOT: {
+        ENABLED: true,
+        WARNING_MESSAGE: "Don't send messages to this channel, you will be punished! This is a honeypot channel, meant for checking for spam and other malicious activity.",
+        CHANNEL_ID: "1549815730000896021",
+    }
 }

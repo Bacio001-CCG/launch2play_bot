@@ -1,10 +1,12 @@
-import {Client, GatewayIntentBits } from "discord.js";
+import {Client, GatewayIntentBits, TextChannel } from "discord.js";
 import config from "./config.js";
+import { registerDiscordEvents } from "./handlers/discordEvents.js";
 
 export class DiscordClient extends Client {
 
     private activitiesInterval?: NodeJS.Timeout;
     private pingInterval?: NodeJS.Timeout;
+    private eventsReady: Promise<void>;
 
     constructor() {
         super({
@@ -14,17 +16,21 @@ export class DiscordClient extends Client {
                 GatewayIntentBits.MessageContent,
             ],
         });
-        this.registerEvents();
+        this.eventsReady = this.registerEvents();
     }
 
     async registerEvents() {
-        this.on("clientReady", () => {
+        await registerDiscordEvents(this);
+
+        this.on("clientReady", async () => {
             let lastActivityIndex = -1;
 
             this.activitiesInterval = setInterval(() => {
                 lastActivityIndex = (lastActivityIndex + 1) % config.ACTIVITIES.length;
                 this.user?.setActivity(config.ACTIVITIES[lastActivityIndex]!.name, { type: config.ACTIVITIES[lastActivityIndex]!.type });
             }, config.ACTIVITIES_INTERVAL);
+
+            await this.honeypotSetup();
 
         });
 
@@ -52,8 +58,8 @@ export class DiscordClient extends Client {
         }
     }
 
-
     async login() {
+        await this.eventsReady;
         return await super.login(process.env.DISCORD_TOKEN as string);
     }
 
@@ -70,5 +76,21 @@ export class DiscordClient extends Client {
         this.pingInterval = setInterval(() => {
             console.log("Ping:", Math.round(this.ws.ping), "ms");
         }, config.PING_INTERVAL);
+    }
+
+    async honeypotSetup() {
+        if(config.HONEYPOT.ENABLED && config.HONEYPOT.CHANNEL_ID) {
+            // Honeypot setup
+            const honeypotChannel = await this.channels.fetch(config.HONEYPOT.CHANNEL_ID) as TextChannel | null;
+            if (!honeypotChannel) {
+                throw new Error("Honeypot channel not found");
+            }
+
+            const honeypotChannelMessages = await honeypotChannel.messages.fetch({ limit: 100 });
+            const honeypotWarningSent = honeypotChannelMessages.some(message => message.content === config.HONEYPOT.WARNING_MESSAGE);
+            if (!honeypotWarningSent) {
+                honeypotChannel.send(config.HONEYPOT.WARNING_MESSAGE);
+            }
+        }
     }
 }
